@@ -1,9 +1,9 @@
 <?php
 /*
 Plugin Name: dnsbl
-Plugin URI: http://derpy.me/
+Plugin URI: https://github.com/Diftraku/yourls_dnsbl
 Description: Searches the submitter's IP from the DNSBL, based on tornevall.org's generic plugin
-Version: 1.0
+Version: 0.1
 Author: Diftraku
 Author URI: http://derpy.me/
 */
@@ -48,27 +48,32 @@ define('DNSBL_EFNET_DRONES', 5);			// Block Drones/Flooding (IRC-based)
 // Abuseat - http://cbl.abuseat.org/
 define('DNSBL_ABUSEAT_ALL', 2);				// Block listed address
 
-// List of servers to check and what to block (see above for flags)
-$dnsbl = array();
-$dnsbl['opm.tornevall.org'] = array(
-	DNSBL_TORNEVALL_WORKING,
-	DNSBL_TORNEVALL_BLITZED,
-	DNSBL_TORNEVALL_ELITE,
-	DNSBL_TORNEVALL_ABUSE,
-	DNSBL_TORNEVALL_ANONYMOUS,
-);
-$dnsbl['dnsbl.njabl.org'] = array(
-	DNSBL_NJABL_FORMMAIL,
-);
-$dnsbl['rbl.efnet.org'] = array(
-	DNSBL_EFNET_OPEN,
-	DNSBL_EFNET_TOR,
-);
-
-// IPs to exclude from the RBL
-$dnsbl_exclude = array(
-		'127.0.0.1'
-);
+function dnsbl_get_options() {
+	// List of servers to check and what to block (see above for flags)
+	//@TODO Create a proper config page for these
+	$dnsbl = array();
+	$dnsbl['opm.tornevall.org'] = array(
+		DNSBL_TORNEVALL_WORKING,
+		DNSBL_TORNEVALL_BLITZED,
+		DNSBL_TORNEVALL_ELITE,
+		DNSBL_TORNEVALL_ABUSE,
+		DNSBL_TORNEVALL_ANONYMOUS,
+	);
+	$dnsbl['dnsbl.njabl.org'] = array(
+		DNSBL_NJABL_FORMMAIL,
+	);
+	$dnsbl['rbl.efnet.org'] = array(
+		DNSBL_EFNET_OPEN,
+		DNSBL_EFNET_TOR,
+	);
+	
+	// IPs to exclude from the RBL
+	$dnsbl_exclude = array(
+			'127.0.0.1'
+	);
+	
+	return array($dnsbl, $dnsbl_exclude);
+}
 
 yourls_add_action('activated_dnsbl/plugin.php', 'dnsbl_activate');
 
@@ -115,8 +120,10 @@ yourls_add_filter( 'pre_add_new_link', 'dnsbl_check_ip' );
  * dnsbl_check_ip()
  * This monolith is a hideous piece that should die a slow painful death...
  */
-function dnsbl_check_ip($url, $keyword, $title) {
-	global $ydb, $dnsbl, $dnsbl_exclude;	
+function dnsbl_check_ip($url, $keyword = '', $title = '') {
+	global $ydb;	
+	
+	list($dnsbl, $dnsbl_exclude) = dnsbl_get_options();
 	
 	// Clean up cache
 	$delay = intval(time()-(DNSBL_MAX_AGE*60));
@@ -127,26 +134,29 @@ function dnsbl_check_ip($url, $keyword, $title) {
 	$remote = filter_var($remote, FILTER_VALIDATE_IP);
 	
 	// Check cache for a hit
-	$result = $ydb->get_results("SELECT ip,flag FROM ".DNSBL_TABLE_PREFIX."dnsbl_cache WHERE ip = '".$remote."' LIMIT 1", ARRAY_A);
-	if (($result['flag'] > 0) && (!in_array($result['ip'], $dnsbl_exclude))) {
-		// Bail!
-		yourls_die('The requested URL cannot be shortened.', 'Forbidden', 403);
+	$result = $ydb->get_results("SELECT ip,flag FROM ".DNSBL_TABLE_PREFIX."dnsbl_cache WHERE ip = '".$remote."127' LIMIT 1", ARRAY_A);
+	
+	if (!is_null($result)) {
+		$result = $result[0];
+		if (($result['flag'] > 0) && (!in_array($result['ip'], $dnsbl_exclude))) {
+			// Bail!
+			yourls_die('The requested URL cannot be shortened.', 'Forbidden', 403);
+		}
 	}
 	else {
-		$flags = array();
-		
-		// Lookup the IP from the servers
+		$return_flags = array();
+		// Lookup the IP from the servers (we're only interested in the server here)
 		foreach ($dnsbl as $server => $flags) {
 			$response = dnsbl_resolve($remote, $server);
 			if ($response[0] == '127') {
-				$flags[$server] = $response[3];
+				$return_flags[$server] = $response[3];
 			}
 		}
 		
 		// Check for any possible results
-		if (!empty($flags)) {
+		if (!empty($return_flags)) {
 			// Process the hits we got
-			foreach ($flags as $server => $flag) {
+			foreach ($return_flags as $server => $flag) {
 				// Check if the flag should be blocked
 				if (in_array($flag, $dnsbl[$server]) || (DNSBL_ANYTHING === true)) {
 					// We have a hit! Bail on the first matching flag
@@ -176,5 +186,5 @@ function dnsbl_check_ip($url, $keyword, $title) {
 function dnsbl_resolve($ip, $server) {
 	$return = explode('.', gethostbyname(implode('.', array_reverse(explode('.', $ip))) . '.' . $server));           // Not ipv6-compatible!
 	// 127-bug-checking
-	if (implode(".", $returnthis) != implode('.', array_reverse(explode('.', $ip))) . '.' . $server) {return $return;} else {return false;}
+	if (implode(".", $return) != implode('.', array_reverse(explode('.', $ip))) . '.' . $server) {return $return;} else {return false;}
 } 
