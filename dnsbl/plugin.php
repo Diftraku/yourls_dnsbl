@@ -134,7 +134,7 @@ function dnsbl_check_ip($url, $keyword = '', $title = '') {
 	$remote = filter_var($remote, FILTER_VALIDATE_IP);
 	
 	// Check cache for a hit
-	$result = $ydb->get_results("SELECT ip,flag FROM ".DNSBL_TABLE_PREFIX."dnsbl_cache WHERE ip = '".$remote."127' LIMIT 1", ARRAY_A);
+	$result = $ydb->get_results("SELECT ip,flag FROM ".DNSBL_TABLE_PREFIX."dnsbl_cache WHERE ip = '".$remote."' LIMIT 1", ARRAY_A);
 	
 	if (!is_null($result)) {
 		$result = $result[0];
