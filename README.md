@@ -1,3 +1,7 @@
+**This project has been archived, you may fork it and continue to develop it further.**
+
+**The code may be insecure as it is and no effort to correct any bugs will be taken.**
+
 ## YOURLS DNSBL Plugin ##
 
 Uses various DNSBLs to check the submitter's IP and prevent shortening URLs if any malicious activity has been detected.
